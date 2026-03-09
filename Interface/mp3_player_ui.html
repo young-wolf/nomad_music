@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=480, initial-scale=1.0">
+<title>SONIC_TERM // v0.1</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #00ff41;
+    --green-dim: #00a629;
+    --green-ghost: #003b10;
+    --amber: #ffb700;
+    --red: #ff3c3c;
+    --bg: #070a07;
+    --bg2: #0d120d;
+    --bg3: #111811;
+    --border: #1a2e1a;
+    --text-dim: #2a4a2a;
+    --scanline: rgba(0,0,0,0.15);
+    --glow: 0 0 8px rgba(0,255,65,0.6), 0 0 20px rgba(0,255,65,0.2);
+    --glow-sm: 0 0 4px rgba(0,255,65,0.5);
+    --amber-glow: 0 0 8px rgba(255,183,0,0.6);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .screen-wrap {
+    position: relative;
+    width: 480px;
+    background: #000;
+    border: 2px solid #1a2e1a;
+    box-shadow: 0 0 40px rgba(0,255,65,0.08), inset 0 0 60px rgba(0,0,0,0.8);
+    overflow: hidden;
+  }
+
+  /* CRT scanlines */
+  .screen-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scanline) 2px,
+      var(--scanline) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* CRT vignette */
+  .screen-wrap::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 99;
+  }
+
+  .screen {
+    background: var(--bg);
+    padding: 0;
+    width: 100%;
+    position: relative;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .header-logo {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--green);
+    text-shadow: var(--glow-sm);
+    letter-spacing: 0.15em;
+  }
+
+  .header-logo span {
+    color: var(--amber);
+    text-shadow: var(--amber-glow);
+  }
+
+  .header-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow-sm);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .header-time {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .battery {
+    font-size: 9px;
+    color: var(--green-dim);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── ALBUM ART AREA ── */
+  .art-section {
+    padding: 10px 12px 6px;
+    position: relative;
+  }
+
+  .art-container {
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 1;
+    width: 100%;
+  }
+
+  /* ASCII art grid background */
+  .art-bg {
+    position: absolute;
+    inset: 0;
+    font-size: 9px;
+    line-height: 1.15;
+    color: var(--green-ghost);
+    padding: 4px;
+    overflow: hidden;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
+  }
+
+  .art-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      rgba(0,255,65,0.03) 0%,
+      transparent 50%,
+      rgba(0,255,65,0.05) 100%
+    );
+  }
+
+  /* Spinning disc in center */
+  .disc-wrap {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .disc {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    border: 2px solid var(--green);
+    box-shadow: var(--glow), inset 0 0 30px rgba(0,255,65,0.05);
+    position: relative;
+    animation: spin 8s linear infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .disc::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--green-dim);
+  }
+
+  .disc::after {
+    content: '';
+    position: absolute;
+    inset: 30px;
+    border-radius: 50%;
+    border: 1px dashed var(--border);
+  }
+
+  .disc-rings {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+  }
+
+  .disc-center {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--amber);
+    box-shadow: var(--amber-glow);
+    z-index: 2;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* VU meter bars on sides of disc */
+  .vu-left, .vu-right {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    height: 100px;
+  }
+
+  .vu-left { left: 16px; align-items: flex-end; }
+  .vu-right { right: 16px; align-items: flex-start; }
+
+  .vu-bar {
+    height: 3px;
+    background: var(--green);
+    border-radius: 1px;
+    transition: width 0.1s ease;
+  }
+
+  .vu-left .vu-bar { box-shadow: var(--glow-sm); }
+  .vu-right .vu-bar { box-shadow: var(--glow-sm); }
+
+  /* corner decorations */
+  .art-corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    color: var(--green-dim);
+    font-size: 10px;
+    line-height: 1;
+  }
+  .art-corner.tl { top: 3px; left: 3px; }
+  .art-corner.tr { top: 3px; right: 3px; text-align: right; }
+  .art-corner.bl { bottom: 3px; left: 3px; }
+  .art-corner.br { bottom: 3px; right: 3px; text-align: right; }
+
+  /* ── TRACK INFO ── */
+  .track-info {
+    padding: 10px 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .track-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-bottom: 2px;
+  }
+
+  .track-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--green);
+    text-shadow: var(--glow-sm);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .track-scroll-wrap {
+    overflow: hidden;
+    position: relative;
+  }
+
+  .track-title-scroll {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 12s linear infinite;
+    padding-right: 40px;
+  }
+
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  .track-artist {
+    font-size: 11px;
+    color: var(--amber);
+    text-shadow: 0 0 6px rgba(255,183,0,0.4);
+    letter-spacing: 0.08em;
+    margin-top: 2px;
+  }
+
+  .track-album {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 0.06em;
+    margin-top: 1px;
+  }
+
+  .track-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  .meta-chip {
+    font-size: 9px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    letter-spacing: 0.1em;
+  }
+
+  .meta-chip.active {
+    color: var(--amber);
+    border-color: var(--amber);
+    text-shadow: 0 0 4px rgba(255,183,0,0.4);
+  }
+
+  /* ── TIMELINE ── */
+  .timeline-section {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .timeline-bar-wrap {
+    position: relative;
+    cursor: pointer;
+    padding: 6px 0;
+  }
+
+  .timeline-track {
+    height: 3px;
+    background: var(--green-ghost);
+    position: relative;
+    border-radius: 1px;
+  }
+
+  .timeline-fill {
+    height: 100%;
+    width: 38%;
+    background: var(--green);
+    box-shadow: var(--glow-sm);
+    border-radius: 1px;
+    position: relative;
+  }
+
+  .timeline-fill::after {
+    content: '';
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow);
+  }
+
+  /* ASCII style progress */
+  .timeline-ascii {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .tl-filled { color: var(--green); text-shadow: var(--glow-sm); }
+  .tl-cursor { color: var(--amber); text-shadow: var(--amber-glow); animation: blink 1s step-end infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+  .timeline-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--green-dim);
+    margin-top: 3px;
+    letter-spacing: 0.08em;
+  }
+
+  .timeline-times .current { color: var(--green); text-shadow: var(--glow-sm); }
+
+  /* ── CONTROLS ── */
+  .controls-section {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .controls-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ctrl-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    transition: all 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ctrl-btn:hover, .ctrl-btn.active {
+    border-color: var(--green);
+    background: var(--green-ghost);
+  }
+
+  .ctrl-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--green);
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .ctrl-btn:active::before { opacity: 0.08; }
+
+  .ctrl-icon {
+    font-size: 14px;
+    color: var(--green-dim);
+    line-height: 1;
+    font-style: normal;
+  }
+
+  .ctrl-btn.active .ctrl-icon,
+  .ctrl-btn:hover .ctrl-icon {
+    color: var(--green);
+    text-shadow: var(--glow-sm);
+  }
+
+  .ctrl-btn.play-btn {
+    padding: 10px 14px;
+    border-color: var(--green-dim);
+  }
+
+  .ctrl-btn.play-btn .ctrl-icon {
+    font-size: 20px;
+    color: var(--green);
+    text-shadow: var(--glow);
+  }
+
+  .ctrl-btn.shuffle-btn .ctrl-icon {
+    color: var(--amber);
+    text-shadow: var(--amber-glow);
+  }
+
+  .ctrl-label {
+    font-size: 7px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .ctrl-btn.active .ctrl-label { color: var(--green-dim); }
+
+  /* vol row */
+  .vol-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .vol-label {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    width: 24px;
+  }
+
+  .vol-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--green-ghost);
+    position: relative;
+  }
+
+  .vol-fill {
+    height: 100%;
+    width: 68%;
+    background: var(--green-dim);
+    position: relative;
+  }
+
+  .vol-fill::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow-sm);
+  }
+
+  .vol-val {
+    font-size: 9px;
+    color: var(--green-dim);
+    width: 28px;
+    text-align: right;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── QUEUE ── */
+  .queue-section {
+    padding: 8px 12px 10px;
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .section-title {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+  }
+
+  .section-count {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .queue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--bg3);
+    cursor: pointer;
+  }
+
+  .queue-item:last-child { border-bottom: none; }
+
+  .queue-item.now-playing {
+    border-bottom-color: var(--border);
+  }
+
+  .queue-num {
+    font-size: 9px;
+    color: var(--text-dim);
+    width: 16px;
+    text-align: right;
+  }
+
+  .queue-item.now-playing .queue-num {
+    color: var(--amber);
+    text-shadow: 0 0 4px rgba(255,183,0,0.4);
+  }
+
+  .queue-name {
+    flex: 1;
+    font-size: 10px;
+    color: var(--green-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.03em;
+  }
+
+  .queue-item.now-playing .queue-name {
+    color: var(--green);
+    text-shadow: var(--glow-sm);
+  }
+
+  .queue-dur {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .queue-bar {
+    height: 1px;
+    width: 30px;
+    background: var(--green-ghost);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .queue-bar-fill {
+    height: 100%;
+    background: var(--green);
+    box-shadow: var(--glow-sm);
+  }
+
+  /* ── STATUS BAR ── */
+  .statusbar {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 4px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .status-left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .status-text {
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+  }
+
+  .status-text.active {
+    color: var(--green-dim);
+  }
+
+  .cursor-blink {
+    display: inline-block;
+    width: 5px;
+    height: 9px;
+    background: var(--green);
+    box-shadow: var(--glow-sm);
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+    margin-left: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="screen-wrap">
+ <div class="screen">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">SONIC_<span>TERM</span> //</div>
+    <div class="header-right">
+      <div class="status-dot"></div>
+      <div class="header-time">11:42</div>
+      <div class="battery">▮▮▮▯ 74%</div>
+    </div>
+  </div>
+
+  <!-- ART -->
+  <div class="art-section">
+    <div class="art-container">
+      <!-- ASCII background texture -->
+      <div class="art-bg" id="asciiBg"></div>
+      <div class="art-overlay"></div>
+
+      <!-- VU Left -->
+      <div class="vu-left" id="vuLeft"></div>
+
+      <!-- Spinning disc -->
+      <div class="disc-wrap">
+        <div class="disc">
+          <div class="disc-center"></div>
+        </div>
+      </div>
+
+      <!-- VU Right -->
+      <div class="vu-right" id="vuRight"></div>
+
+      <!-- Corners -->
+      <div class="art-corner tl">⌐</div>
+      <div class="art-corner tr">¬</div>
+      <div class="art-corner bl">└</div>
+      <div class="art-corner br">┘</div>
+    </div>
+  </div>
+
+  <!-- TRACK INFO -->
+  <div class="track-info">
+    <div class="track-label">// NOW_PLAYING</div>
+    <div class="track-scroll-wrap">
+      <div class="track-title track-title-scroll">
+        GHOST IN THE MACHINE &nbsp;&nbsp;&nbsp; GHOST IN THE MACHINE
+      </div>
+    </div>
+    <div class="track-artist">THE ALGORITHM</div>
+    <div class="track-album">BRUTE FORCE [2014] · TRACK 07</div>
+    <div class="track-meta">
+      <div class="meta-chip active">FLAC</div>
+      <div class="meta-chip active">320K</div>
+      <div class="meta-chip">SHUFFLE</div>
+      <div class="meta-chip">REPEAT</div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="timeline-section">
+    <div class="timeline-bar-wrap" id="timelineWrap">
+      <div class="timeline-track">
+        <div class="timeline-fill" id="timelineFill"></div>
+      </div>
+    </div>
+    <div class="timeline-ascii" id="timelineAscii"></div>
+    <div class="timeline-times">
+      <span class="current" id="timeCurrent">2:14</span>
+      <span id="timeTotal">5:52</span>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls-section">
+    <div class="controls-row">
+      <div class="ctrl-btn" title="Previous">
+        <i class="ctrl-icon">⏮</i>
+        <span class="ctrl-label">PREV</span>
+      </div>
+      <div class="ctrl-btn" title="Rewind 10s">
+        <i class="ctrl-icon">«</i>
+        <span class="ctrl-label">-10s</span>
+      </div>
+      <div class="ctrl-btn play-btn active" title="Pause">
+        <i class="ctrl-icon">⏸</i>
+        <span class="ctrl-label">PAUSE</span>
+      </div>
+      <div class="ctrl-btn" title="Skip 10s">
+        <i class="ctrl-icon">»</i>
+        <span class="ctrl-label">+10s</span>
+      </div>
+      <div class="ctrl-btn" title="Next">
+        <i class="ctrl-icon">⏭</i>
+        <span class="ctrl-label">NEXT</span>
+      </div>
+      <div class="ctrl-btn shuffle-btn" title="Shuffle">
+        <i class="ctrl-icon">⇄</i>
+        <span class="ctrl-label">SHUF</span>
+      </div>
+    </div>
+    <div class="vol-row">
+      <span class="vol-label">VOL</span>
+      <div class="vol-bar">
+        <div class="vol-fill" id="volFill"></div>
+      </div>
+      <span class="vol-val" id="volVal">68%</span>
+    </div>
+  </div>
+
+  <!-- QUEUE -->
+  <div class="queue-section">
+    <div class="section-header">
+      <span class="section-title">// QUEUE</span>
+      <span class="section-count">7 / 42 TRACKS</span>
+    </div>
+
+    <div class="queue-item">
+      <span class="queue-num">05</span>
+      <span class="queue-name">Floating Point</span>
+      <div class="queue-bar"><div class="queue-bar-fill" style="width:0%"></div></div>
+      <span class="queue-dur">4:31</span>
+    </div>
+    <div class="queue-item">
+      <span class="queue-num">06</span>
+      <span class="queue-name">Stack Overflow</span>
+      <div class="queue-bar"><div class="queue-bar-fill" style="width:0%"></div></div>
+      <span class="queue-dur">3:58</span>
+    </div>
+    <div class="queue-item now-playing">
+      <span class="queue-num">▶ 07</span>
+      <span class="queue-name">Ghost in the Machine</span>
+      <div class="queue-bar"><div class="queue-bar-fill" style="width:38%"></div></div>
+      <span class="queue-dur">5:52</span>
+    </div>
+    <div class="queue-item">
+      <span class="queue-num">08</span>
+      <span class="queue-name">Race Condition</span>
+      <div class="queue-bar"><div class="queue-bar-fill" style="width:0%"></div></div>
+      <span class="queue-dur">6:14</span>
+    </div>
+    <div class="queue-item">
+      <span class="queue-num">09</span>
+      <span class="queue-name">Kernel Panic</span>
+      <div class="queue-bar"><div class="queue-bar-fill" style="width:0%"></div></div>
+      <span class="queue-dur">4:07</span>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <div class="status-left">
+      <span class="status-text active">PLAYING</span>
+      <span class="status-text">·</span>
+      <span class="status-text">I2C:OK</span>
+      <span class="status-text">·</span>
+      <span class="status-text">DAC:HIFI</span>
+    </div>
+    <div>
+      <span class="status-text">root@sonic_term<div class="cursor-blink"></div></span>
+    </div>
+  </div>
+
+ </div><!-- /screen -->
+</div><!-- /screen-wrap -->
+
+<script>
+// ASCII background texture
+const chars = '01░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αβγδεζ<>{}[]()/*';
+const bg = document.getElementById('asciiBg');
+let txt = '';
+for(let i=0; i<2200; i++) txt += chars[Math.floor(Math.random()*chars.length)] + (i%55===54?'\n':'');
+bg.textContent = txt;
+
+// VU meters
+function makeVU(el, count=18) {
+  for(let i=0; i<count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'vu-bar';
+    const w = Math.random()*22+4;
+    bar.style.width = w+'px';
+    // color: green at bottom, amber in mid, red at top
+    if(i > count*0.75) bar.style.background = '#ff3c3c';
+    else if(i > count*0.5) bar.style.background = '#ffb700';
+    el.appendChild(bar);
+  }
+}
+makeVU(document.getElementById('vuLeft'));
+makeVU(document.getElementById('vuRight'));
+
+// Animate VU
+function animateVU() {
+  ['vuLeft','vuRight'].forEach(id => {
+    const bars = document.getElementById(id).querySelectorAll('.vu-bar');
+    bars.forEach((bar,i) => {
+      const base = Math.sin(Date.now()/400 + i*0.4)*10;
+      const w = Math.max(3, Math.min(30, 12 + base + Math.random()*6));
+      bar.style.width = w+'px';
+      bar.style.opacity = w > 6 ? '1' : '0.3';
+    });
+  });
+  requestAnimationFrame(animateVU);
+}
+animateVU();
+
+// ASCII timeline
+function buildAscii(pct) {
+  const total = 42;
+  const filled = Math.floor(total * pct);
+  let s = '<span class="tl-filled">';
+  for(let i=0;i<filled;i++) s += '█';
+  s += '</span><span class="tl-cursor">▌</span><span>';
+  for(let i=filled+1;i<total;i++) s += '░';
+  s += '</span>';
+  return s;
+}
+document.getElementById('timelineAscii').innerHTML = buildAscii(0.38);
+
+// Timeline interactive
+let pct = 0.38;
+let playing = true;
+const fill = document.getElementById('timelineFill');
+const timeCurrent = document.getElementById('timeCurrent');
+
+document.getElementById('timelineWrap').addEventListener('click', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  pct = (e.clientX - rect.left) / rect.width;
+  pct = Math.max(0, Math.min(1, pct));
+  updateTimeline();
+});
+
+function toTime(secs) {
+  const m = Math.floor(secs/60);
+  const s = Math.floor(secs%60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+function updateTimeline() {
+  fill.style.width = (pct*100)+'%';
+  document.getElementById('timelineAscii').innerHTML = buildAscii(pct);
+  timeCurrent.textContent = toTime(pct * 352);
+}
+
+// Auto-advance timeline
+setInterval(() => {
+  if(playing && pct < 1) {
+    pct += 1/352 * 0.5;
+    updateTimeline();
+  }
+}, 500);
+
+// Play/pause toggle
+const playBtn = document.querySelector('.play-btn');
+playBtn.addEventListener('click', () => {
+  playing = !playing;
+  playBtn.querySelector('.ctrl-icon').textContent = playing ? '⏸' : '▶';
+  playBtn.querySelector('.ctrl-label').textContent = playing ? 'PAUSE' : 'PLAY';
+  document.querySelector('.status-dot').style.animationPlayState = playing ? 'running' : 'paused';
+  document.querySelector('.disc').style.animationPlayState = playing ? 'running' : 'paused';
+});
+
+// Volume bar click
+document.querySelector('.vol-bar').addEventListener('click', e => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const v = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+  document.getElementById('volFill').style.width = v+'%';
+  document.getElementById('volVal').textContent = v+'%';
+});
+
+// Ctrl buttons hover glow
+document.querySelectorAll('.ctrl-btn').forEach(btn => {
+  btn.addEventListener('mousedown', () => btn.style.boxShadow = '0 0 10px rgba(0,255,65,0.3)');
+  btn.addEventListener('mouseup', () => btn.style.boxShadow = '');
+  btn.addEventListener('mouseleave', () => btn.style.boxShadow = '');
+});
+</script>
+</body>
+</html>
