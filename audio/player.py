@@ -3,33 +3,52 @@ vlc module to pause, resume, next track, previous track, seek, get position.
 """
 import time
 import vlc
+from pathlib import Path
+import playlist_loader
 
 class Player:
+
     def __init__(self):
-        self.vlc.media_player_new()
+
+        self._instance = vlc.Instance('--no-video')
+        self._player = self._instance.media_player_new()
         self.current_index = 0
         self.volume = 60
         self.mute = False
         self.shuffle = False
         self.repeat = False
 
-    def queue_track(self, track_path):
-        pass
+    def load_library(self) -> dict:
 
+        playlist_loader.load_music_library()
+        library_dict = {track.name: track for track in playlist_loader.music_library}
+        print(self.load_library)
+
+        return library_dict.get(track_path)
+    
     def load_playlist(self, playlist):
         pass
 
     def load_track(self, track_path):
-        media = self.
+
+        media = self._instance.media_new(track_path)
+        self._player.set_media(media)
+        print("Track loaded: ", track_path)
 
     def play(self, track_path):
-        
+
+        self._player.play()
+        print("Playing track: ", track_path)
     
     def pause(self):
-        pass
+
+        self._player.pause()
+        print("Track paused")
 
     def resume(self):
-        pass
+        
+        self._player.play()
+        print("Track resumed")
 
     def next_track(self):
         pass
@@ -60,9 +79,21 @@ class Player:
         # current track, position, duration, volume, is_playing, shuffle, etc.
         pass
 
+my_player = Player()
 
+"""
+Temporary music path for testing
+"""
+track_path = Path('./music/Ill Faith Records - Be A Witness (Ft. Shakewell).mp3')
+print(track_path.name)
 
+"""
+Call class functions for testing. Remove when done
+"""
 
+my_player.load_library()
+
+my_player.load_track(track_path.name)
 
 
 
