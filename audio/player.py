@@ -22,10 +22,9 @@ class Player:
 
         playlist_loader.load_music_library()
         library_dict = {track.name: track for track in playlist_loader.music_library}
-        print(self.load_library)
+        print(library_dict)
 
-        return library_dict.get(track_path)
-    
+        return library_dict
     def load_playlist(self, playlist):
         pass
 
@@ -46,7 +45,7 @@ class Player:
         print("Track paused")
 
     def resume(self):
-        
+
         self._player.play()
         print("Track resumed")
 
